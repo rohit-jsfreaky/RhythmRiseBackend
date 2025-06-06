@@ -1,5 +1,8 @@
 import ytSearch from "yt-search";
 import ytdl from "@distube/ytdl-core";
+import dotenv from "dotenv";
+
+dotenv.config(); // Load .env variables
 
 export const getAudioStreamUrl = async (req, res) => {
   const videoUrl = req.query.url;
@@ -9,7 +12,14 @@ export const getAudioStreamUrl = async (req, res) => {
   }
 
   try {
-    const info = await ytdl.getInfo(videoUrl);
+    // Pass the cookie in request headers
+    const info = await ytdl.getInfo(videoUrl, {
+      requestOptions: {
+        headers: {
+          cookie: process.env.YT_COOKIE,
+        },
+      },
+    });
 
     const audioFormat = ytdl.chooseFormat(info.formats, {
       quality: "highestaudio",
@@ -28,7 +38,7 @@ export const getAudioStreamUrl = async (req, res) => {
     });
   } catch (error) {
     console.error("Error:", error);
-    return res.status(500).json({ error: "Something went wrong" });
+    return res.status(500).json({ error: "Something went wrong", details: error.message });
   }
 };
 
