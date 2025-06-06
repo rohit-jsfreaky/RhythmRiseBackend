@@ -1,0 +1,8 @@
+# Node modules
+node_modules/
+
+# Environment variables
+.env
+
+# Optional: ignore environment files with extensions like .env.local, .env.production, etc.
+.env.*
