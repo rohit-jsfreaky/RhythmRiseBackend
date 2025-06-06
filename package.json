@@ -12,7 +12,6 @@
   "description": "",
   "dependencies": {
     "@distube/ytdl-core": "^4.16.10",
-    "@ybd-project/ytdl-core": "^6.0.8",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
