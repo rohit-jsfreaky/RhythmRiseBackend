@@ -4,6 +4,15 @@ import dotenv from "dotenv";
 
 dotenv.config(); // Load .env variables
 
+// Middleware to bypass YouTube restrictions
+const HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+  "Accept-Language": "en-US,en;q=0.9",
+  Accept: "*/*",
+  Referer: "https://www.youtube.com/",
+};
+
 export const getAudioStreamUrl = async (req, res) => {
   const videoUrl = req.query.url;
 
@@ -12,33 +21,41 @@ export const getAudioStreamUrl = async (req, res) => {
   }
 
   try {
-    // Pass the cookie in request headers
+    if (!ytdl.validateURL(videoUrl)) throw new Error("Invalid YouTube URL");
     const info = await ytdl.getInfo(videoUrl, {
-      requestOptions: {
-        headers: {
-          cookie: process.env.YT_COOKIE,
-        },
-      },
+      requestOptions: { headers: HEADERS },
+      lang: "en",
     });
 
-    const audioFormat = ytdl.chooseFormat(info.formats, {
-      quality: "highestaudio",
-    });
+    // Extract audio formats and filter valid URLs
+    const audioFormats = ytdl
+      .filterFormats(info.formats, "audioonly")
+      .filter(
+        (format) =>
+          format.url &&
+          !format.url.includes("ratebypass") &&
+          format.mimeType.includes("audio")
+      );
 
-    if (!audioFormat || !audioFormat.url) {
-      return res.status(400).json({ error: "Failed to extract audio URL" });
-    }
+    if (!audioFormats.length) throw new Error("No audio streams found");
 
-    return res.status(200).json({
+    // Select highest quality audio
+    const bestAudio = audioFormats.reduce((best, current) =>
+      current.audioBitrate > best.audioBitrate ? current : best
+    );
+
+    res.json({
       title: info.videoDetails.title,
-      thumbnail: info.videoDetails.thumbnails?.pop()?.url,
+      audioUrl: bestAudio.url,
       duration: info.videoDetails.lengthSeconds,
-      uploader: info.videoDetails.author.name,
-      audioUrl: audioFormat.url,
+      thumbnail: info.videoDetails.thumbnails[0]?.url,
     });
   } catch (error) {
     console.error("Error:", error);
-    return res.status(500).json({ error: "Something went wrong", details: error.message });
+    res.status(500).json({
+      error: "Failed to fetch audio URL",
+      details: error.message,
+    });
   }
 };
 
