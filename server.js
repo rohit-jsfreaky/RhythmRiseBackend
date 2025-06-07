@@ -1,23 +1,49 @@
-import fetch from "node-fetch";
+import { spawn } from "child_process";
+import path from "path";
 
-async function fetchYouTubeSearch() {
-  const query = "arijit singh hits";
-  const res = await fetch(
-    `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`
-  );
-  const html = await res.text();
+const cookiesPath = path.resolve("cookies.txt");
 
-  // Extract ytInitialData JSON string using regex
-  const match = html.match(/var ytInitialData = (.*?);<\/script>/);
+const videoUrl = "https://www.youtube.com/watch?v=vnkY1TM5Ygc";
 
-  if (!match) throw new Error("Failed to extract ytInitialData");
+export const getAudioWithYtDlp = () => {
+  return new Promise((resolve, reject) => {
+    // Build the yt-dlp arguments
+    const args = [
+      videoUrl,
+      "--cookies",
+      cookiesPath,
+      "-f",
+      "bestaudio",
+      "-g", // Get direct audio URL
+    ];
 
-  const data = JSON.parse(match[1]);
+    const ytdlp = spawn("yt-dlp", args);
 
-  // Now parse `data` to extract video info (this step is complex)
-  return data;
-}
+    let output = "";
+    let error = "";
 
-const data = await fetchYouTubeSearch();
+    ytdlp.stdout.on("data", (data) => {
+      output += data.toString();
+    });
 
-console.log(data);
+    ytdlp.stderr.on("data", (data) => {
+      error += data.toString();
+    });
+
+    ytdlp.on("close", (code) => {
+      if (code === 0) {
+        resolve(output.trim());
+      } else {
+        reject(new Error(`yt-dlp exited with code ${code}: ${error}`));
+      }
+    });
+  });
+};
+
+getAudioWithYtDlp()
+  .then((audioUrl) => {
+    console.log("Audio URL:", audioUrl);
+  })
+  .catch((error) => {
+    console.error("Error:", error.message);
+  });
