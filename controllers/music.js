@@ -1,16 +1,46 @@
 import ytSearch from "yt-search";
 import ytdl from "@distube/ytdl-core";
 import dotenv from "dotenv";
+import { spawn } from "child_process";
+import path from "path";
 
 dotenv.config(); // Load .env variables
 
-// Middleware to bypass YouTube restrictions
-const HEADERS = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-  "Accept-Language": "en-US,en;q=0.9",
-  Accept: "*/*",
-  Referer: "https://www.youtube.com/",
+const cookiesPath = path.resolve("cookies.txt");
+
+export const getAudioWithYtDlp = (videoUrl) => {
+  return new Promise((resolve, reject) => {
+    // Build the yt-dlp arguments
+    const args = [
+      videoUrl,
+      "--cookies",
+      cookiesPath,
+      "-f",
+      "bestaudio",
+      "-g", // Get direct audio URL
+    ];
+
+    const ytdlp = spawn("yt-dlp", args);
+
+    let output = "";
+    let error = "";
+
+    ytdlp.stdout.on("data", (data) => {
+      output += data.toString();
+    });
+
+    ytdlp.stderr.on("data", (data) => {
+      error += data.toString();
+    });
+
+    ytdlp.on("close", (code) => {
+      if (code === 0) {
+        resolve(output.trim());
+      } else {
+        reject(new Error(`yt-dlp exited with code ${code}: ${error}`));
+      }
+    });
+  });
 };
 
 export const getAudioStreamUrl = async (req, res) => {
@@ -21,35 +51,15 @@ export const getAudioStreamUrl = async (req, res) => {
   }
 
   try {
-    if (!ytdl.validateURL(videoUrl)) throw new Error("Invalid YouTube URL");
-    const info = await ytdl.getInfo(videoUrl, {
-      requestOptions: { headers: HEADERS },
-      lang: "en",
-    });
+    // Use yt-dlp to get the audio URL
+    const audioUrl = await getAudioWithYtDlp(videoUrl);
 
-    // Extract audio formats and filter valid URLs
-    const audioFormats = ytdl
-      .filterFormats(info.formats, "audioonly")
-      .filter(
-        (format) =>
-          format.url &&
-          !format.url.includes("ratebypass") &&
-          format.mimeType.includes("audio")
-      );
+    if (!audioUrl) {
+      return res.status(404).json({ error: "Audio not found" });
+    }
 
-    if (!audioFormats.length) throw new Error("No audio streams found");
-
-    // Select highest quality audio
-    const bestAudio = audioFormats.reduce((best, current) =>
-      current.audioBitrate > best.audioBitrate ? current : best
-    );
-
-    res.json({
-      title: info.videoDetails.title,
-      audioUrl: bestAudio.url,
-      duration: info.videoDetails.lengthSeconds,
-      thumbnail: info.videoDetails.thumbnails[0]?.url,
-    });
+    // Return the audio URL
+    res.status(200).json({ url: audioUrl });
   } catch (error) {
     console.error("Error:", error);
     res.status(500).json({
