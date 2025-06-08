@@ -20,6 +20,7 @@
     "nodemon": "^3.1.10",
     "play-dl": "^1.9.7",
     "scrape-youtube": "^2.4.0",
+    "youtube-search-api": "^1.2.2",
     "youtube-suggest-gen": "^1.0.7",
     "youtubei": "^1.6.7",
     "youtubei.js": "^13.4.0",

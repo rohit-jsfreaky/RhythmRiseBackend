@@ -1,5 +1,5 @@
 import ytSearch from "yt-search";
-import { suggestions } from "youtube-suggest-gen";
+import youtubesearchapi from "youtube-search-api";
 
 export const getAudioDetails = async (req, res) => {
   const videoUrl = req.query.url;
@@ -57,29 +57,32 @@ export const searchSongs = async (req, res) => {
 };
 
 export const getRelatedSongs = async (req, res) => {
-  const videoUrl = req.query.url;
+  const { videoId } = req.query;
 
-  if (!videoUrl) {
+  if (!videoId) {
     return res.status(400).json({ error: "Missing videoId or URL" });
   }
 
   try {
-    const searchResult = await ytSearch(videoUrl);
-    const videoId = new URL(videoUrl).searchParams.get("v");
+    const data = await youtubesearchapi.GetVideoDetails(videoId);
 
-    // Find exact match from results
-    const video = searchResult.videos.find((v) => v.videoId === videoId);
+    // console.log("Related songs data:", data.suggestion);
 
-    if (!video) {
-      return res.status(404).json({ error: "Audio not found" });
+    if (!data.suggestion || data.suggestion.length === 0) {
+      return res.status(404).json({ error: "No related songs found" });
     }
 
-    const Suggestions = await suggestions(video.title);
+    const relatedSongs = data.suggestion.slice(0, 10).map((song) => ({
+      url: `https://www.youtube.com/watch?v=${song.id}`,
+      thumbnail: song.thumbnail[0].url,
+      title: song.title,
+      duration: song.length.simpleText,
+    }));
 
-    console.log("Related videos:", Suggestions);
+    console.log("Related songs:", relatedSongs);
 
     return res.status(200).json({
-      hey: "hey",
+      relatedSongs: relatedSongs,
     });
   } catch (error) {
     console.log("Error in getRelatedSongs:", error);
