@@ -66,26 +66,25 @@ export const getRelatedSongs = async (req, res) => {
     return res.status(400).json({ error: "Missing videoId" });
   }
 
+  console.log("Fetching related songs for videoId:", videoId);
   try {
     const video = await youtube.getVideo(videoId);
 
     if (!video) {
       return res.status(404).json({ error: "Video not found" });
     }
-    const related = video.related.items
-      .slice(0, 10)
-      .map((item) => {
-        // Create a clean object with only the data we need
-        return {
-          id: item.id,
-          title: item.title,
-          url: `https://www.youtube.com/watch?v=${item.id}`,
-          thumbnail: item.thumbnails?.[0]?.url || null,
-          duration: item.duration,
-          uploader: item.channel?.name || null,
-          viewCount: item.viewCount || 0,
-        };
-      });
+    const related = video.related.items.slice(0, 10).map((item) => {
+      // Create a clean object with only the data we need
+      return {
+        id: item.id,
+        title: item.title,
+        url: `https://www.youtube.com/watch?v=${item.id}`,
+        thumbnail: item.thumbnails?.[0]?.url || null,
+        duration: item.duration,
+        uploader: item.channel?.name || null,
+        viewCount: item.viewCount || 0,
+      };
+    });
 
     return res.status(200).json({ related });
   } catch (error) {
