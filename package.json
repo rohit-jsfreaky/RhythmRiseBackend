@@ -19,6 +19,7 @@
     "hydra_scraper": "^1.0.18",
     "nodemon": "^3.1.10",
     "play-dl": "^1.9.7",
+    "youtubei": "^1.6.7",
     "yt-search": "^2.13.1",
     "ytdl-mp3": "^5.2.2",
     "ytsr": "^3.8.4"

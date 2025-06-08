@@ -1,5 +1,8 @@
 import ytSearch from "yt-search";
-import play from "play-dl";
+
+import { Client } from "youtubei";
+
+const youtube = new Client();
 
 export const getAudioDetails = async (req, res) => {
   const videoUrl = req.query.url;
@@ -64,33 +67,27 @@ export const getRelatedSongs = async (req, res) => {
   }
 
   try {
-    const url = `https://www.youtube.com/watch?v=${videoId}`;
-    const info = await play.video_info(url);
+    const video = await youtube.getVideo(videoId);
 
-    const relatedUrls = info.related_videos.slice(0, 10);
+    if (!video) {
+      return res.status(404).json({ error: "Video not found" });
+    }
+    const related = video.related.items
+      .slice(0, 10)
+      .map((item) => {
+        // Create a clean object with only the data we need
+        return {
+          id: item.id,
+          title: item.title,
+          url: `https://www.youtube.com/watch?v=${item.id}`,
+          thumbnail: item.thumbnails?.[0]?.url || null,
+          duration: item.duration,
+          uploader: item.channel?.name || null,
+          viewCount: item.viewCount || 0,
+        };
+      });
 
-    const relatedDetails = await Promise.all(
-      relatedUrls.map(async (relatedUrl) => {
-        try {
-          const relatedInfo = await play.video_info(relatedUrl);
-          const v = relatedInfo.video_details;
-
-          return {
-            title: v.title,
-            url: v.url,
-            thumbnail: v.thumbnails?.[0]?.url || null,
-            duration: v.durationRaw,
-            uploader: v.channel?.name,
-          };
-        } catch (err) {
-          return null; // skip broken entries
-        }
-      })
-    );
-
-    return res.status(200).json({
-      related: relatedDetails.filter((item) => item !== null),
-    });
+    return res.status(200).json({ related });
   } catch (error) {
     console.error("Error fetching related videos:", error);
     return res.status(500).json({ error: "Failed to fetch related videos" });
