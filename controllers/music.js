@@ -1,5 +1,7 @@
 import ytSearch from "yt-search";
 import youtubesearchapi from "youtube-search-api";
+import { ytmp3 } from "hydra_scraper";
+import axios from "axios";
 
 export const getAudioDetails = async (req, res) => {
   const videoUrl = req.query.url;
@@ -87,5 +89,37 @@ export const getRelatedSongs = async (req, res) => {
   } catch (error) {
     console.log("Error in getRelatedSongs:", error);
     return res.status(500).json({ error: "Failed to get related songs" });
+  }
+};
+
+export const getAudioStream = async (req, res) => {
+  const videoUrl = req.query.url;
+
+  if (!videoUrl) {
+    return res.status(400).json({ error: "Missing URL" });
+  }
+
+  try {
+    const downloadUrl = await ytmp3(videoUrl);
+
+    if (!downloadUrl || !downloadUrl.download || !downloadUrl.download.url) {
+      return res.status(404).json({ error: "Audio stream not found" });
+    }
+
+    console.log("Download URL:", downloadUrl.download.url);
+
+    const response = await axios.get(downloadUrl.download.url, {
+      responseType: "stream",
+    });
+
+    res.set({
+      "Content-Type": response.headers["content-type"] || "audio/mpeg",
+      "Accept-Ranges": "bytes",
+    });
+
+    response.data.pipe(res);
+  } catch (error) {
+    console.log("Error in getAudioStream:", error);
+    return res.status(500).json({ error: "Failed to get audio stream" });
   }
 };
