@@ -8,7 +8,7 @@ import { promisify } from "util";
 import stream from "stream";
 
 const pipeline = promisify(stream.pipeline);
-const cacheDir = path.resolve("./tmp/audio-cache");
+const cacheDir = path.join("/tmp", "audio-cache");
 
 if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
 
