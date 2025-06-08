@@ -1,73 +1,5 @@
 import ytSearch from "yt-search";
-import ytdl from "@distube/ytdl-core";
-import dotenv from "dotenv";
-import { spawn } from "child_process";
-import path from "path";
-
-dotenv.config(); // Load .env variables
-
-const cookiesPath = path.resolve("cookies.txt");
-
-export const getAudioWithYtDlp = (videoUrl) => {
-  return new Promise((resolve, reject) => {
-    // Build the yt-dlp arguments
-    const args = [
-      videoUrl,
-      "--cookies",
-      cookiesPath,
-      "-f",
-      "bestaudio",
-      "-g", // Get direct audio URL
-    ];
-
-    const ytdlp = spawn("yt-dlp", args);
-
-    let output = "";
-    let error = "";
-
-    ytdlp.stdout.on("data", (data) => {
-      output += data.toString();
-    });
-
-    ytdlp.stderr.on("data", (data) => {
-      error += data.toString();
-    });
-
-    ytdlp.on("close", (code) => {
-      if (code === 0) {
-        resolve(output.trim());
-      } else {
-        reject(new Error(`yt-dlp exited with code ${code}: ${error}`));
-      }
-    });
-  });
-};
-
-export const getAudioStreamUrl = async (req, res) => {
-  const videoUrl = req.query.url;
-
-  if (!videoUrl || !ytdl.validateURL(videoUrl)) {
-    return res.status(400).json({ error: "Invalid or missing URL" });
-  }
-
-  try {
-    // Use yt-dlp to get the audio URL
-    const audioUrl = await getAudioWithYtDlp(videoUrl);
-
-    if (!audioUrl) {
-      return res.status(404).json({ error: "Audio not found" });
-    }
-
-    // Return the audio URL
-    res.status(200).json({ url: audioUrl });
-  } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({
-      error: "Failed to fetch audio URL",
-      details: error.message,
-    });
-  }
-};
+import play from "play-dl";
 
 export const getAudioDetails = async (req, res) => {
   const videoUrl = req.query.url;
@@ -132,24 +64,33 @@ export const getRelatedSongs = async (req, res) => {
   }
 
   try {
-    const video = await youtube.getVideo(videoId);
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    const info = await play.video_info(url);
 
-    if (!video) {
-      return res.status(404).json({ error: "Video not found" });
-    }
+    const relatedUrls = info.related_videos.slice(0, 10);
 
-    const related = video.related.items
-      .filter((item) => item.type === "video")
-      .slice(0, 10)
-      .map((item) => ({
-        title: item.title,
-        url: item.url,
-        thumbnail: item.thumbnail?.url || null,
-        duration: item.duration,
-        uploader: item.channel?.name || null,
-      }));
+    const relatedDetails = await Promise.all(
+      relatedUrls.map(async (relatedUrl) => {
+        try {
+          const relatedInfo = await play.video_info(relatedUrl);
+          const v = relatedInfo.video_details;
 
-    return res.json({ related });
+          return {
+            title: v.title,
+            url: v.url,
+            thumbnail: v.thumbnails?.[0]?.url || null,
+            duration: v.durationRaw,
+            uploader: v.channel?.name,
+          };
+        } catch (err) {
+          return null; // skip broken entries
+        }
+      })
+    );
+
+    return res.status(200).json({
+      related: relatedDetails.filter((item) => item !== null),
+    });
   } catch (error) {
     console.error("Error fetching related videos:", error);
     return res.status(500).json({ error: "Failed to fetch related videos" });
