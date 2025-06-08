@@ -2,6 +2,15 @@ import ytSearch from "yt-search";
 import youtubesearchapi from "youtube-search-api";
 import { ytmp3 } from "hydra_scraper";
 import axios from "axios";
+import fs from "fs";
+import path from "path";
+import { promisify } from "util";
+import stream from "stream";
+
+const pipeline = promisify(stream.pipeline);
+const cacheDir = path.resolve("./tmp/audio-cache");
+
+if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
 
 export const getAudioDetails = async (req, res) => {
   const videoUrl = req.query.url;
@@ -94,32 +103,55 @@ export const getRelatedSongs = async (req, res) => {
 
 export const getAudioStream = async (req, res) => {
   const videoUrl = req.query.url;
-
-  if (!videoUrl) {
-    return res.status(400).json({ error: "Missing URL" });
-  }
+  if (!videoUrl) return res.status(400).json({ error: "Missing URL" });
 
   try {
-    const downloadUrl = await ytmp3(videoUrl);
+    const { download, metadata } = await ytmp3(videoUrl);
+    const videoId = metadata.videoId;
+    const filePath = path.join(cacheDir, `${videoId}.mp3`);
 
-    if (!downloadUrl || !downloadUrl.download || !downloadUrl.download.url) {
-      return res.status(404).json({ error: "Audio stream not found" });
+    // Download if not cached
+    if (!fs.existsSync(filePath)) {
+      const response = await axios.get(download.url, {
+        responseType: "stream",
+      });
+      await pipeline(response.data, fs.createWriteStream(filePath));
+
+      // Auto delete after 30 mins
+      setTimeout(() => {
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      }, 30 * 60 * 1000); // 30 mins
     }
 
-    console.log("Download URL:", downloadUrl.download.url);
+    // Handle Range requests
+    const stat = fs.statSync(filePath);
+    const range = req.headers.range;
 
-    const response = await axios.get(downloadUrl.download.url, {
-      responseType: "stream",
-    });
+    if (!range) {
+      res.writeHead(200, {
+        "Content-Type": "audio/mpeg",
+        "Content-Length": stat.size,
+      });
+      fs.createReadStream(filePath).pipe(res);
+    } else {
+      const [startStr, endStr] = range.replace(/bytes=/, "").split("-");
+      const start = parseInt(startStr, 10);
+      const end = endStr ? parseInt(endStr, 10) : stat.size - 1;
 
-    res.set({
-      "Content-Type": response.headers["content-type"] || "audio/mpeg",
-      "Accept-Ranges": "bytes",
-    });
+      const chunkSize = end - start + 1;
+      const file = fs.createReadStream(filePath, { start, end });
 
-    response.data.pipe(res);
-  } catch (error) {
-    console.log("Error in getAudioStream:", error);
-    return res.status(500).json({ error: "Failed to get audio stream" });
+      res.writeHead(206, {
+        "Content-Range": `bytes ${start}-${end}/${stat.size}`,
+        "Accept-Ranges": "bytes",
+        "Content-Length": chunkSize,
+        "Content-Type": "audio/mpeg",
+      });
+
+      file.pipe(res);
+    }
+  } catch (err) {
+    console.error("Stream error:", err.message);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
