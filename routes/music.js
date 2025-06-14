@@ -4,6 +4,7 @@ import {
   getAudioStream,
   getRelatedSongs,
   getRelatedSongsJioSavan,
+  getSongsDetailsJioSavan,
   getTrendingJioSavanSongs,
   searchSongs,
   searchSongsJioSavan,
@@ -22,3 +23,5 @@ musicRouter.get("/search-songs-jio-savan", searchSongsJioSavan);
 musicRouter.get("/related-songs-jio-savan/:id", getRelatedSongsJioSavan);
 
 musicRouter.get("/get-trending-songs-jio-savan", getTrendingJioSavanSongs);
+
+musicRouter.get("/get-songs-details-jio-savan/:id", getSongsDetailsJioSavan);

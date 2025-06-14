@@ -477,3 +477,46 @@ export const getTrendingJioSavanSongs = async (req, res) => {
     });
   }
 };
+
+export const getSongsDetailsJioSavan = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    if (!id) {
+      return res.status(400).json({ message: "Song ID is required" });
+    }
+
+    const response = await axios.get(`https://saavn.dev/api/songs/${id}`);
+
+    if (!response.data && !response.data.data) {
+      return res.status(404).json({ message: "Song not found" });
+    }
+
+    const songsData = response.data.data[0];
+
+    const song = {
+      id: songsData.id,
+      title: songsData.name,
+      author: songsData.label,
+      duration: songsData.duration,
+      thumbnail:
+        songsData.image && songsData.image.length > 0
+          ? songsData.image[songsData.image.length - 1].url
+          : "",
+      downloadUrl: {
+        "12kbps": songsData.downloadUrl[0].url,
+        "48kbps": songsData.downloadUrl[1].url,
+        "96kbps": songsData.downloadUrl[2].url,
+        "160kbps": songsData.downloadUrl[3].url,
+        "320kbps": songsData.downloadUrl[4].url,
+      },
+    };
+
+    return res.status(200).json({
+      data: song,
+    });
+  } catch (error) {
+    console.error("Error in getSongsDetailsJioSavan:", error);
+    return res.status(500).json({ message: "Failed to get song details" });
+  }
+};
