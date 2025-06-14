@@ -85,6 +85,8 @@ export const searchSongs = async (req, res) => {
 export const getRelatedSongs = async (req, res) => {
   const { videoId } = req.query;
 
+  console.log("Received videoId:", videoId);
+
   if (!videoId) {
     return res.status(400).json({ error: "Missing videoId or URL" });
   }
@@ -92,20 +94,20 @@ export const getRelatedSongs = async (req, res) => {
   try {
     const data = await youtubesearchapi.GetVideoDetails(videoId);
 
-    // console.log("Related songs data:", data.suggestion);
-
     if (!data.suggestion || data.suggestion.length === 0) {
       return res.status(404).json({ error: "No related songs found" });
     }
 
     const relatedSongs = data.suggestion.slice(0, 10).map((song) => ({
       url: `https://www.youtube.com/watch?v=${song.id}`,
-      thumbnail: song.thumbnail[0].url,
-      title: song.title,
-      duration: song.length.simpleText,
+      title: song.title || "",
+      duration:
+        song.length?.simpleText ||
+        song.length?.accessibility?.accessibilityData?.label ||
+        "",
+      author: song.channelTitle || song.shortBylineText || "",
+      thumbnail: song.thumbnail?.[1]?.url || song.thumbnail?.[0]?.url || "",
     }));
-
-    console.log("Related songs:", relatedSongs);
 
     return res.status(200).json({
       relatedSongs: relatedSongs,
