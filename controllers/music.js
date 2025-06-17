@@ -336,35 +336,26 @@ export const getRelatedSongsJioSavan = async (req, res) => {
       return res.status(400).json({ error: "Song ID is required" });
     }
 
-    const cacheKey = `${id}_${limit}`;
-    if (suggestionCache.has(cacheKey)) {
-      const cached = suggestionCache.get(cacheKey);
-      if (Date.now() - cached.timestamp < CACHE_DURATION) {
-        console.log(`🚀 Serving cached suggestions for ${id}`);
-        return res.json({
-          ...cached.data,
-          cached: true,
-          cacheAge: Math.round((Date.now() - cached.timestamp) / 1000) + "s",
-        });
-      } else {
-        suggestionCache.delete(cacheKey);
-      }
-    }
-
     console.log(`🎵 Getting enhanced suggestions for song ID: ${id}`);
 
-    // Step 1: Get target song details
+    // Step 1: Get target song details with better error handling
     let targetSong = null;
     try {
-      targetSong = await getSongDetails(id);
+      targetSong = await Promise.race([
+        getSongDetails(id),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Song details timeout")), 10000)
+        ),
+      ]);
     } catch (error) {
-      return res.status(404).json({
-        error: "Song not found",
-        message: "Unable to fetch song details from any source",
-        songId: id,
-        suggestion: "Please verify the song ID is correct",
-        debug: { originalError: error.message },
-      });
+      console.log(`⚠️ Failed to get song details: ${error.message}`);
+      // Continue with minimal song info for suggestions
+      targetSong = {
+        id: id,
+        title: "Unknown",
+        subtitle: "Unknown",
+        language: "hindi",
+      };
     }
 
     const normalizedTargetSong = {
@@ -399,33 +390,112 @@ export const getRelatedSongsJioSavan = async (req, res) => {
         targetSong.has_lyrics === "true" || targetSong.hasLyrics || false,
     };
 
+    console.log(`🎯 Target song normalized:`, {
+      id: normalizedTargetSong.id,
+      title: normalizedTargetSong.title,
+      artist: normalizedTargetSong.primaryArtists,
+    });
+
     let candidateSongs = [];
     try {
       candidateSongs = await Promise.race([
         getSongSpecificSuggestions(id, normalizedTargetSong, 80),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Suggestion timeout")), 15000)
+          setTimeout(() => reject(new Error("Suggestion timeout")), 20000)
         ),
       ]);
 
-      // console.log("candidateSongs",candidateSongs)
+      console.log(`📊 Raw candidate songs count: ${candidateSongs.length}`);
     } catch (error) {
       console.log(`⚠️ Suggestion generation failed: ${error.message}`);
-      candidateSongs = []; // Continue with empty array
+
+      // Fallback: Try direct search for similar songs
+      try {
+        console.log("🔄 Attempting fallback search...");
+        const fallbackQuery =
+          normalizedTargetSong.primaryArtists !== "Unknown Artist"
+            ? normalizedTargetSong.primaryArtists
+            : normalizedTargetSong.title;
+
+        const fallbackResponse = await axios.get(
+          `https://saavn.dev/api/search/songs`,
+          {
+            params: { query: fallbackQuery, page: 1, limit: 20 },
+            timeout: 8000,
+          }
+        );
+
+        if (
+          fallbackResponse.data &&
+          fallbackResponse.data.data &&
+          fallbackResponse.data.data.results
+        ) {
+          candidateSongs = fallbackResponse.data.data.results
+            .filter((song) => song.id !== id) // Exclude original song
+            .map((song) => ({
+              primary_pid: song.id,
+              song: song.name,
+              thumb: song.image?.[0]?.url || "",
+              playtime: song.duration || "0",
+              label: song.label || song.primaryArtists || "",
+            }));
+          console.log(`✅ Fallback search found ${candidateSongs.length} songs`);
+        }
+      } catch (fallbackError) {
+        console.log(`❌ Fallback search also failed: ${fallbackError.message}`);
+        candidateSongs = [];
+      }
     }
 
-    if (candidateSongs.length <= 0) {
-      return res.status(404).json({ message: "Suggestions not found" });
+    if (candidateSongs.length === 0) {
+      return res.status(404).json({
+        message: "No related songs found",
+        songId: id,
+        suggestion: "Try searching for songs by this artist manually",
+        debug: {
+          targetSong: normalizedTargetSong.title,
+          artist: normalizedTargetSong.primaryArtists,
+        },
+      });
     }
 
-    const suggestedSongs = candidateSongs.map((song) => ({
-      id: song.primary_pid,
-      title: song.song,
-      thumbnail: song.thumb,
-      duration: Number(song.playtime),
-      author: song.label,
-    }));
-    res.json(suggestedSongs);
+    // Transform the candidate songs with better error handling
+    const suggestedSongs = candidateSongs
+      .filter(
+        (song) =>
+          song &&
+          (song.primary_pid || song.id) &&
+          (song.primary_pid || song.id) !== id
+      )
+      .map((song) => ({
+        id: song.primary_pid || song.id,
+        title: song.song || song.name || song.title || "Unknown Title",
+        thumbnail: song.thumb || song.image || "",
+        duration: Number(song.playtime || song.duration || 0),
+        author:
+          song.label || song.primaryArtists || song.artist || "Unknown Artist",
+      }))
+      .slice(0, limit);
+
+    console.log(`🎵 Formatted suggested songs count: ${suggestedSongs.length}`);
+
+    if (suggestedSongs.length === 0) {
+      return res.status(404).json({
+        message: "No valid related songs found after processing",
+        rawCandidatesCount: candidateSongs.length,
+        songId: id,
+      });
+    }
+
+    // Get stream URLs for all suggested songs
+    const songsWithStreamUrls = await jioSavanStreamSongSongUrl(suggestedSongs);
+
+    const totalTime = Date.now() - requestStart;
+    console.log(
+      `✅ Successfully returned ${songsWithStreamUrls.length} related songs in ${totalTime}ms`
+    );
+
+    res.json(songsWithStreamUrls);
   } catch (error) {
     const totalTime = Date.now() - requestStart;
     console.error("❌ Suggestions error:", error.message);
