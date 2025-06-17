@@ -23,7 +23,7 @@ export async function getSongSpecificSuggestions(songId, targetSong, limit = 60)
       });
 
       if (response.data) {
-        console.log("songid", response.data);
+        console.log("songid", response);
         allSuggestions = response.data[songId];
       }
     } catch (error) {
