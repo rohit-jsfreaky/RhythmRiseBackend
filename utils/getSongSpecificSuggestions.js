@@ -42,7 +42,7 @@ export async function getSongSpecificSuggestions(
 
         // Handle different response formats
         let suggestions = [];
-
+        console.log(`📊 Checking response structure...`,response);
         if (Array.isArray(response.data)) {
           suggestions = response.data;
         } else if (response.data[songId]) {
