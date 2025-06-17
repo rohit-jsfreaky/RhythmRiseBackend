@@ -33,6 +33,9 @@ export async function makeOptimizedRequest(urlTemplate, options = {}) {
       try {
         console.log(`🔄 Attempt ${attempt} for: ${url.substring(0, 100)}...`);
 
+
+        console.log(url);
+
         const response = await axios.get(url, {
           headers,
           timeout: timeout * attempt, // Increase timeout on retry
