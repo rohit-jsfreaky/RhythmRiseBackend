@@ -536,7 +536,7 @@ export const getTrendingJioSavanSongs = async (req, res) => {
       }
     );
 
-    console.log(`📊 First API response status: ${firstApiResponse}`);
+    console.log(`📊 First API response status: ${firstApiResponse.data}`);
 
     const firstApiData = firstApiResponse.data;
 
@@ -572,7 +572,7 @@ export const getTrendingJioSavanSongs = async (req, res) => {
       }
     );
 
-    console.log(`📊 Second API response status: ${secondApiResponse}`);
+    console.log(`📊 Second API response status: ${secondApiResponse.data}`);
     if (secondApiResponse.data && secondApiResponse.data.new_trending) {
       const secondApiDataSongs = secondApiResponse.data.new_trending.filter(
         (song) => song.type === "song"
