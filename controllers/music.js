@@ -550,40 +550,38 @@ export const getTrendingJioSavanSongs = async (req, res) => {
 
     const firstApiData = firstApiResponse.data;
 
-    const playListId = firstApiData[0].id;
+    for (const item of firstApiData) {
+      const itemPlayListId = item.id;
 
-    if (playListId) {
-      const playlistResponse = await makeOptimizedRequest(
-        (baseUrl) =>
-          `${baseUrl}?__call=playlist.getDetails&api_version=4&_format=json&_marker=0&listid=${playListId}`,
-        { timeout: 8000 }
-      );
+      if (itemPlayListId) {
+        try {
+          const playlistResponse = await makeOptimizedRequest(
+            (baseUrl) =>
+              `${baseUrl}?__call=playlist.getDetails&api_version=4&_format=json&_marker=0&listid=${itemPlayListId}`,
+            { timeout: 8000 }
+          );
 
-      console.log(
-        `📊 playlistResponse API response received with ${
-          Array.isArray(playlistResponse.data)
-            ? playlistResponse.data.length
-            : "unknown"
-        } items`
-      );
-      console.log(
-        "playlistResponse API response structure:",
-        JSON.stringify(playlistResponse.data).substring(0, 10000000) + "..."
-      );
+          const playListData = playlistResponse?.data?.list;
 
-      const playListData = playlistResponse.data.list;
+          if (Array.isArray(playListData) && playListData.length > 0) {
+            const playListSongs = playListData.map((song) => ({
+              id: song.id,
+              title: song.title,
+              author: song.more_info?.label || "",
+              duration: parseInt(song.more_info?.duration) || 0,
+              thumbnail: song.image || "",
+            }));
 
-      if (playListData && playListData.length > 0) {
-        const playListSongs = playListData.map((song) => ({
-          id: song.id,
-          title: song.title,
-          author: song.more_info?.label || "",
-          duration: parseInt(song.more_info?.duration) || 0,
-          thumbnail: song.image || "",
-        }));
-
-        if (playListSongs.length > 0) {
-          trendingSongs = [...playListSongs];
+            if (playListSongs.length > 0) {
+              trendingSongs = [...playListSongs];
+              break; // Found valid songs, stop the loop
+            }
+          }
+        } catch (err) {
+          console.error(
+            `Error fetching playlist for id ${itemPlayListId}`,
+            err
+          );
         }
       }
     }
