@@ -336,6 +336,21 @@ export const getRelatedSongsJioSavan = async (req, res) => {
       return res.status(400).json({ error: "Song ID is required" });
     }
 
+    const cacheKey = `${id}_${limit}`;
+    if (suggestionCache.has(cacheKey)) {
+      const cached = suggestionCache.get(cacheKey);
+      if (Date.now() - cached.timestamp < CACHE_DURATION) {
+        console.log(`🚀 Serving cached suggestions for ${id}`);
+        return res.json({
+          ...cached.data,
+          cached: true,
+          cacheAge: Math.round((Date.now() - cached.timestamp) / 1000) + "s",
+        });
+      } else {
+        suggestionCache.delete(cacheKey);
+      }
+    }
+
     console.log(`🎵 Getting enhanced suggestions for song ID: ${id}`);
 
     // Step 1: Get target song details
@@ -392,14 +407,14 @@ export const getRelatedSongsJioSavan = async (req, res) => {
           setTimeout(() => reject(new Error("Suggestion timeout")), 15000)
         ),
       ]);
-      
+
       // console.log("candidateSongs",candidateSongs)
     } catch (error) {
       console.log(`⚠️ Suggestion generation failed: ${error.message}`);
       candidateSongs = []; // Continue with empty array
     }
 
-    if (candidateSongs.length < 0) {
+    if (candidateSongs.length <= 0) {
       return res.status(404).json({ message: "Suggestions not found" });
     }
 
@@ -410,10 +425,7 @@ export const getRelatedSongsJioSavan = async (req, res) => {
       duration: Number(song.playtime),
       author: song.label,
     }));
-
-    const songsWithStreamUrls = await jioSavanStreamSongSongUrl(suggestedSongs);
-
-    res.json(songsWithStreamUrls);
+    res.json(suggestedSongs);
   } catch (error) {
     const totalTime = Date.now() - requestStart;
     console.error("❌ Suggestions error:", error.message);
