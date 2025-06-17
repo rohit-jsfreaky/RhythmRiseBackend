@@ -404,7 +404,6 @@ export const getRelatedSongsJioSavan = async (req, res) => {
       ),
     ]);
 
-
     if (candidateSongs.length === 0) {
       // Fallback: Try direct search for similar songs
       try {
@@ -537,7 +536,10 @@ export const getTrendingJioSavanSongs = async (req, res) => {
       }
     );
 
+    console.log(`📊 First API response status: ${firstApiResponse}`);
+
     const firstApiData = firstApiResponse.data;
+
     const playListId = firstApiData[0].id;
 
     if (playListId) {
@@ -570,6 +572,7 @@ export const getTrendingJioSavanSongs = async (req, res) => {
       }
     );
 
+    console.log(`📊 Second API response status: ${secondApiResponse}`);
     if (secondApiResponse.data && secondApiResponse.data.new_trending) {
       const secondApiDataSongs = secondApiResponse.data.new_trending.filter(
         (song) => song.type === "song"
@@ -589,6 +592,8 @@ export const getTrendingJioSavanSongs = async (req, res) => {
         }
       }
     }
+
+    console.log("trandingSongs", trendingSongs.length);
 
     // Remove duplicates based on song ID
     const uniqueSongs = trendingSongs.filter(
