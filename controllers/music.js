@@ -27,6 +27,65 @@ export const suggestionCache = new Map();
 export const songCache = new Map(); // Cache for song details
 export const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 
+const getSongStreamData = async (songId) => {
+  try {
+    const response = await axios.get(`https://saavn.dev/api/songs/${songId}`, {
+      timeout: 5000,
+    });
+
+    if (response.data && response.data.data && response.data.data[0]) {
+      const songData = response.data.data[0];
+      return {
+        downloadUrl: {
+          "12kbps": songData.downloadUrl[0]?.url || "",
+          "48kbps": songData.downloadUrl[1]?.url || "",
+          "96kbps": songData.downloadUrl[2]?.url || "",
+          "160kbps": songData.downloadUrl[3]?.url || "",
+          "320kbps": songData.downloadUrl[4]?.url || "",
+        },
+      };
+    }
+    return null;
+  } catch (error) {
+    console.warn(`Failed to get stream URL for song ${songId}:`, error.message);
+    return null;
+  }
+};
+
+const jioSavanStreamSongSongUrl = async (songs) => {
+  const streamDataPromises = songs.map((song) =>
+    getSongStreamData(song.id).then((streamData) => ({
+      songId: song.id,
+      streamData,
+    }))
+  );
+
+  const streamDataResults = await Promise.allSettled(streamDataPromises);
+
+  // Merge stream URLs with trending songs data
+  const songsWithStreamUrls = songs.map((song) => {
+    const streamResult = streamDataResults.find(
+      (result) =>
+        result.status === "fulfilled" && result.value.songId === song.id
+    );
+
+    const streamData = streamResult?.value?.streamData;
+
+    return {
+      ...song,
+      downloadUrl: streamData?.downloadUrl || {
+        "12kbps": "",
+        "48kbps": "",
+        "96kbps": "",
+        "160kbps": "",
+        "320kbps": "",
+      },
+    };
+  });
+
+  return songsWithStreamUrls;
+};
+
 export const getAudioDetails = async (req, res) => {
   const videoUrl = req.query.url;
 
@@ -366,7 +425,10 @@ export const getRelatedSongsJioSavan = async (req, res) => {
       duration: Number(song.playtime),
       author: song.label,
     }));
-    res.json(suggestedSongs);
+
+    const songsWithStreamUrls = await jioSavanStreamSongSongUrl(suggestedSongs);
+
+    res.json(songsWithStreamUrls);
   } catch (error) {
     const totalTime = Date.now() - requestStart;
     console.error("❌ Suggestions error:", error.message);
@@ -462,9 +524,23 @@ export const getTrendingJioSavanSongs = async (req, res) => {
       }
     }
 
+    // Remove duplicates based on song ID
+    const uniqueSongs = trendingSongs.filter(
+      (song, index, self) => index === self.findIndex((s) => s.id === song.id)
+    );
+
+    // Limit the results
+    const limitedSongs = uniqueSongs.slice(0, limit);
+
+    console.log(
+      `🎵 Fetching stream URLs for ${limitedSongs.length} trending songs in parallel...`
+    );
+
+    const songsWithStreamUrls = await jioSavanStreamSongSongUrl(limitedSongs);
+
     return res.json({
       success: true,
-      data: trendingSongs,
+      data: songsWithStreamUrls,
     });
   } catch (error) {
     const totalTime = Date.now() - requestStart;
