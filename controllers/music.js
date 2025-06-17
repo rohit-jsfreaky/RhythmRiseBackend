@@ -404,7 +404,6 @@ export const getRelatedSongsJioSavan = async (req, res) => {
       ),
     ]);
 
-    console.log(`⚠️ Suggestion generation failed: ${error.message}`);
 
     if (candidateSongs.length === 0) {
       // Fallback: Try direct search for similar songs
