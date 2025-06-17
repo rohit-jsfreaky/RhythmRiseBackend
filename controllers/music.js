@@ -536,8 +536,17 @@ export const getTrendingJioSavanSongs = async (req, res) => {
       }
     );
 
-    console.log(`📊 First API response received with ${Array.isArray(firstApiResponse.data) ? firstApiResponse.data.length : 'unknown'} items`);
-    console.log('First API response structure:', JSON.stringify(firstApiResponse.data).substring(0, 200) + '...');
+    console.log(
+      `📊 First API response received with ${
+        Array.isArray(firstApiResponse.data)
+          ? firstApiResponse.data.length
+          : "unknown"
+      } items`
+    );
+    console.log(
+      "First API response structure:",
+      JSON.stringify(firstApiResponse.data).substring(0, 200) + "..."
+    );
 
     const firstApiData = firstApiResponse.data;
 
@@ -549,6 +558,19 @@ export const getTrendingJioSavanSongs = async (req, res) => {
           `${baseUrl}?__call=playlist.getDetails&api_version=4&_format=json&_marker=0&listid=${playListId}`,
         { timeout: 8000 }
       );
+
+      console.log(
+        `📊 playlistResponse API response received with ${
+          Array.isArray(playlistResponse.data)
+            ? playlistResponse.data.length
+            : "unknown"
+        } items`
+      );
+      console.log(
+        "playlistResponse API response structure:",
+        JSON.stringify(playlistResponse.data).substring(0, 10000000) + "..."
+      );
+
       const playListData = playlistResponse.data.list;
 
       if (playListData && playListData.length > 0) {
