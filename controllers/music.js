@@ -397,18 +397,16 @@ export const getRelatedSongsJioSavan = async (req, res) => {
     });
 
     let candidateSongs = [];
-    try {
-      candidateSongs = await Promise.race([
-        getSongSpecificSuggestions(id, normalizedTargetSong, 80),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Suggestion timeout")), 20000)
-        ),
-      ]);
+    candidateSongs = await Promise.race([
+      getSongSpecificSuggestions(id, normalizedTargetSong, 80),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Suggestion timeout")), 20000)
+      ),
+    ]);
 
-      console.log(`📊 Raw candidate songs count: ${candidateSongs.length}`);
-    } catch (error) {
-      console.log(`⚠️ Suggestion generation failed: ${error.message}`);
+    console.log(`⚠️ Suggestion generation failed: ${error.message}`);
 
+    if (candidateSongs.length === 0) {
       // Fallback: Try direct search for similar songs
       try {
         console.log("🔄 Attempting fallback search...");
@@ -439,7 +437,9 @@ export const getRelatedSongsJioSavan = async (req, res) => {
               playtime: song.duration || "0",
               label: song.label || song.primaryArtists || "",
             }));
-          console.log(`✅ Fallback search found ${candidateSongs.length} songs`);
+          console.log(
+            `✅ Fallback search found ${candidateSongs.length} songs`
+          );
         }
       } catch (fallbackError) {
         console.log(`❌ Fallback search also failed: ${fallbackError.message}`);
