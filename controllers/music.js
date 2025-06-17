@@ -536,7 +536,8 @@ export const getTrendingJioSavanSongs = async (req, res) => {
       }
     );
 
-    console.log(`📊 First API response status: ${firstApiResponse.data}`);
+    console.log(`📊 First API response received with ${Array.isArray(firstApiResponse.data) ? firstApiResponse.data.length : 'unknown'} items`);
+    console.log('First API response structure:', JSON.stringify(firstApiResponse.data).substring(0, 200) + '...');
 
     const firstApiData = firstApiResponse.data;
 
