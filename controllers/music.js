@@ -30,12 +30,14 @@ export const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 const getSongStreamData = async (songId) => {
   try {
     const response = await axios.get(`https://saavn.dev/api/songs/${songId}`, {
-      timeout: 5000,
+      timeout: 10000,
     });
 
     if (response.data && response.data.data && response.data.data[0]) {
       const songData = response.data.data[0];
       return {
+        thumbnail:
+          songData.image?.find((img) => img.quality === "500x500")?.url || "",
         downloadUrl: {
           "12kbps": songData.downloadUrl[0]?.url || "",
           "48kbps": songData.downloadUrl[1]?.url || "",
@@ -70,9 +72,9 @@ const jioSavanStreamSongSongUrl = async (songs) => {
     );
 
     const streamData = streamResult?.value?.streamData;
-
     return {
       ...song,
+      thumbnail: streamData.thumbnail,
       downloadUrl: streamData?.downloadUrl || {
         "12kbps": "",
         "48kbps": "",
@@ -302,7 +304,7 @@ export const searchSongsJioSavan = async (req, res) => {
       id: song.id,
       title: song.name,
       thumbnail:
-        song.image?.find((img) => img.quality === "150x150")?.url || "", // fallback to empty if not found
+        song.image?.find((img) => img.quality === "500x500")?.url || "",
       duration: song.duration,
       author: song.label,
       downloadUrls:
