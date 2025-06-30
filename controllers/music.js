@@ -30,12 +30,14 @@ export const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 const getSongStreamData = async (songId) => {
   try {
     const response = await axios.get(`https://saavn.dev/api/songs/${songId}`, {
-      timeout: 5000,
+      timeout: 10000,
     });
 
     if (response.data && response.data.data && response.data.data[0]) {
       const songData = response.data.data[0];
       return {
+        thumbnail:
+          songData.image?.find((img) => img.quality === "500x500")?.url || "",
         downloadUrl: {
           "12kbps": songData.downloadUrl[0]?.url || "",
           "48kbps": songData.downloadUrl[1]?.url || "",
@@ -70,9 +72,9 @@ const jioSavanStreamSongSongUrl = async (songs) => {
     );
 
     const streamData = streamResult?.value?.streamData;
-
     return {
       ...song,
+      thumbnail: streamData.thumbnail,
       downloadUrl: streamData?.downloadUrl || {
         "12kbps": "",
         "48kbps": "",
@@ -302,7 +304,7 @@ export const searchSongsJioSavan = async (req, res) => {
       id: song.id,
       title: song.name,
       thumbnail:
-        song.image?.find((img) => img.quality === "150x150")?.url || "", // fallback to empty if not found
+        song.image?.find((img) => img.quality === "500x500")?.url || "",
       duration: song.duration,
       author: song.label,
       downloadUrls:
@@ -664,6 +666,8 @@ export const getSongsDetailsJioSavan = async (req, res) => {
 
     const songsData = response.data.data[0];
 
+    console.log("Fetched song data:", songsData);
+
     const song = {
       id: songsData.id,
       title: songsData.name,
@@ -673,13 +677,11 @@ export const getSongsDetailsJioSavan = async (req, res) => {
         songsData.image && songsData.image.length > 0
           ? songsData.image[songsData.image.length - 1].url
           : "",
-      downloadUrl: {
-        "12kbps": songsData.downloadUrl[0].url,
-        "48kbps": songsData.downloadUrl[1].url,
-        "96kbps": songsData.downloadUrl[2].url,
-        "160kbps": songsData.downloadUrl[3].url,
-        "320kbps": songsData.downloadUrl[4].url,
-      },
+      downloadUrl:
+        songsData.downloadUrl?.map((dl) => ({
+          quality: dl.quality,
+          url: dl.url,
+        })) || [],
     };
 
     return res.status(200).json({
